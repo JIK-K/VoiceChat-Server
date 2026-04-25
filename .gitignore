@@ -1,4 +1,7 @@
-﻿##### Windows
+﻿# vcpkg
+vcpkg_installed/
+
+##### Windows
 # Windows thumbnail cache files
 Thumbs.db
 Thumbs.db:encryptable

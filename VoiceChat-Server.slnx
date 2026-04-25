@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="VoiceChat-Server.vcxproj" />
+  <Project Path="VoiceChat-Server.vcxproj" Id="a69cd8f8-dcd9-4ebc-b775-5283bcee60d1" />
 </Solution>
