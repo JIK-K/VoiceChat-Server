@@ -128,6 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\network\Session.cpp" />
     <ClCompile Include="src\network\TCPListener.cpp" />
     <ClCompile Include="src\network\UDPListener.cpp" />
     <ClCompile Include="src\protocol\Packet.cpp" />
@@ -140,6 +141,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\network\Session.hpp" />
     <ClInclude Include="src\network\TCPListener.hpp" />
     <ClInclude Include="src\network\UDPListener.hpp" />
     <ClInclude Include="src\protocol\Packet.hpp" />
