@@ -1,9 +1,25 @@
 ﻿#include "Session.hpp"
+#include "../room/RoomManager.hpp"
 #include <iostream>
 
 Session::Session(asio::ip::tcp::socket socket) : _socket(std::move(socket)) {}
-
+Session::~Session()
+{
+	if (_roomId != -1)
+		RoomManager::Instance().LeaveRoom(_roomId, _userId);
+}
 void Session::Start() {
+	auto roomList = RoomManager::Instance().GetRoomList();
+	json j = { {"event", "room_list"}, {"rooms", json::array()} };
+	for (auto& [roomId, count] : roomList)
+		j["rooms"].push_back({ {"roomId", roomId}, {"count", count} });
+
+	PacketHeader header{};
+	header.type = PACKET_TYPE_CONTROL;
+	std::string payload = j.dump();
+	header.payloadLength = static_cast<uint16_t>(payload.size());
+	Send(header, payload);
+
 	ReceiveHeader();
 }
 
@@ -60,16 +76,35 @@ void Session::HandlePacket(const PacketHeader& header, const std::string& payloa
 		if (cmd == "join") {
 			_userId = j["userId"];
 			_roomId = j["roomId"];
-			std::cout << "join - userId: " << _userId
-				<< " roomId: " << _roomId << "\n";
+			std::cout << "join - userId: " << _userId << " roomId: " << _roomId << "\n";
 
-			// 응답
-			Send(header, R"({"result":"ok","msg":"join success"})");
+			RoomManager::Instance().JoinRoom(_roomId, shared_from_this());
+
+			auto room = RoomManager::Instance().FindRoom(_roomId);
+			if (room) {
+				json userList = { 
+					{"event", "user_list"}, 
+					{"users", room->GetUserList()} 
+				};
+				Send(header, userList.dump());
+
+				json joined = { {"event", "user_joined"}, {"userId", _userId} };
+				room->BroadcastJson(_userId, joined.dump());
+			}
 		}
 		else if (cmd == "leave") {
+			auto room = RoomManager::Instance().FindRoom(_roomId);
+			if (room) {
+				json left = { 
+					{"event", "user_left"}, 
+					{"userId", _userId} 
+				};
+				room->BroadcastJson(_userId, left.dump());
+				RoomManager::Instance().LeaveRoom(_roomId, _userId);
+			}
 			std::cout << "leave - userId: " << _userId << "\n";
-			Send(header, R"({"result":"ok","msg":"leave success"})");
 			_roomId = -1;
+			Send(header, R"({"result":"ok","msg":"leave success"})");
 		}
 	}
 }
@@ -91,6 +126,20 @@ void Session::Send(const PacketHeader& header, const std::string& payload)
 			if (ec) {
 				std::cout << "SEND FAIL : USER : " << _userId << "\n";
 			}
+		}
+	);
+}
+
+void Session::SendRaw(const std::vector<uint8_t>& data)
+{
+	auto packet = std::make_shared<std::vector<uint8_t>>(data);
+	auto self = shared_from_this();
+
+	asio::async_write(_socket,
+		asio::buffer(*packet),
+		[this, self, packet](asio::error_code ec, std::size_t) {
+			if (ec)
+				std::cout << "SENDRAW FAIL : USER : " << _userId << "\n";
 		}
 	);
 }

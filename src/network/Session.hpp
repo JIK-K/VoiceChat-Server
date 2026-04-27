@@ -17,9 +17,11 @@ class Session : public std::enable_shared_from_this<Session>
 {
 public:
 	Session(asio::ip::tcp::socket socket);
+	~Session();
 
 	void Start();
 	void Send(const PacketHeader& header, const std::string& payload);
+	void SendRaw(const std::vector<uint8_t>& data);
 
 	int GetUserId() const { return _userId; }
 	int GetRoomId() const { return _roomId; }
