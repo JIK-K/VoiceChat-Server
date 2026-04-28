@@ -1,12 +1,21 @@
-#include "UDPListener.hpp"
-#include "../protocol/Packet.hpp"   // HEADER_SIZE 등
+#include "UDPSocket.hpp"
+#include "../room/RoomManager.hpp"
 #include <iostream>
 
-UDPListener::UDPListener(asio::io_context& io_context, unsigned short port, RoomManager& roomManager)
+UDPSocket::UDPSocket(asio::io_context& io_context, RoomManager* roomManager)
     : m_ioContext(io_context)
     , m_socket(io_context)
     , m_roomManager(roomManager)
     , m_recvBuffer(2048)
+{
+}
+
+UDPSocket::~UDPSocket()
+{
+    StopReceiving();
+}
+
+bool UDPSocket::Initialize(unsigned short port)
 {
     asio::error_code ec;
 
@@ -14,7 +23,7 @@ UDPListener::UDPListener(asio::io_context& io_context, unsigned short port, Room
     if (ec)
     {
         std::cout << "UDP socket open 실패: " << ec.message() << std::endl;
-        return;
+        return false;
     }
 
     asio::ip::udp::endpoint endpoint(asio::ip::udp::v4(), port);
@@ -22,35 +31,48 @@ UDPListener::UDPListener(asio::io_context& io_context, unsigned short port, Room
     if (ec)
     {
         std::cout << "UDP bind 실패 (포트 " << port << "): " << ec.message() << std::endl;
-        return;
+        return false;
     }
-    std::cout << "UDP SERVER START - PORT : " << port << std::endl;
+
+    std::cout << "UDP 소켓 초기화 완료 (포트 " << port << ")" << std::endl;
+    return true;
 }
 
-UDPListener::~UDPListener()
-{
-    Stop();
-}
-
-void UDPListener::Start()
+void UDPSocket::StartReceiving()
 {
     if (m_running) return;
     m_running = true;
     DoReceive();
-    std::cout << "UDP SERVER LISTENING (비동기)" << std::endl;
+    std::cout << "UDP 비동기 수신 시작 (asio)" << std::endl;
 }
 
-void UDPListener::Stop()
+void UDPSocket::StopReceiving()
 {
     if (!m_running) return;
     m_running = false;
 
     asio::error_code ec;
     m_socket.close(ec);
-    std::cout << "UDPListener 수신 중지" << std::endl;
+    std::cout << "UDP 수신 중지" << std::endl;
 }
 
-void UDPListener::DoReceive()
+bool UDPSocket::SendTo(const asio::ip::udp::endpoint& clientEndpoint,
+    const char* data, std::size_t length)
+{
+    if (!m_socket.is_open()) return false;
+
+    asio::error_code ec;
+    m_socket.send_to(asio::buffer(data, length), clientEndpoint, 0, ec);
+
+    if (ec)
+    {
+        std::cout << "UDP SendTo 실패: " << ec.message() << std::endl;
+        return false;
+    }
+    return true;
+}
+
+void UDPSocket::DoReceive()
 {
     if (!m_running) return;
 
@@ -61,9 +83,9 @@ void UDPListener::DoReceive()
         {
             if (!m_running) return;
 
-            if (!ec && bytes_received > 0)
+            if (!ec && bytes_received > 0 && m_roomManager)
             {
-                m_roomManager.HandleUdpVoicePacket(m_senderEndpoint,
+                m_roomManager->HandleUdpVoicePacket(m_senderEndpoint,
                     m_recvBuffer.data(),
                     static_cast<int>(bytes_received));
             }
@@ -74,18 +96,4 @@ void UDPListener::DoReceive()
 
             DoReceive();  // 다시 수신 대기
         });
-}
-
-void UDPListener::SendTo(const asio::ip::udp::endpoint& target,
-    const uint8_t* data, std::size_t length)
-{
-    if (!m_socket.is_open()) return;
-
-    asio::error_code ec;
-    m_socket.send_to(asio::buffer(data, length), target, 0, ec);
-
-    if (ec)
-    {
-        std::cout << "UDP SendTo 실패: " << ec.message() << std::endl;
-    }
 }

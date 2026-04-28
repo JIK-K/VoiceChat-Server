@@ -42,8 +42,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -131,6 +131,7 @@
     <ClCompile Include="src\network\Session.cpp" />
     <ClCompile Include="src\network\TCPListener.cpp" />
     <ClCompile Include="src\network\UDPListener.cpp" />
+    <ClCompile Include="src\network\UDPSocket.cpp" />
     <ClCompile Include="src\protocol\Packet.cpp" />
     <ClCompile Include="src\room\Room.cpp" />
     <ClCompile Include="src\room\RoomManager.cpp" />
@@ -144,6 +145,7 @@
     <ClInclude Include="src\network\Session.hpp" />
     <ClInclude Include="src\network\TCPListener.hpp" />
     <ClInclude Include="src\network\UDPListener.hpp" />
+    <ClInclude Include="src\network\UDPSocket.hpp" />
     <ClInclude Include="src\protocol\Packet.hpp" />
     <ClInclude Include="src\room\Room.hpp" />
     <ClInclude Include="src\room\RoomManager.hpp" />
