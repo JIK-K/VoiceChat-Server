@@ -2,6 +2,8 @@
 #include <memory>
 #include <vector>
 #include <mutex>
+#include <asio.hpp>
+#include "../protocol/Packet.hpp"
 
 class Session;
 
@@ -23,6 +25,11 @@ public:
 
 	std::vector<int> GetUserList() const;
 	int GetUserCount() const;
+
+	void BroadcastVoice(const asio::ip::udp::endpoint& senderEndpoint,
+		const PacketHeader& header,
+		const char* payload,
+		int payloadLen);
 
 private:
 	int _roomId;

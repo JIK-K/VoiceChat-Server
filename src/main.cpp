@@ -3,6 +3,7 @@
 #include <iostream>
 #include <asio.hpp>
 #include "network/TCPListener.hpp"
+#include "network/UDPListener.hpp"
 #include "network/Session.hpp"
 
 using json = nlohmann::json;
@@ -18,7 +19,10 @@ int main()
         }
     );
 
+	UDPListener udpListener(io, 9001, RoomManager::Instance());
+
     tcpListener.Start();
+    udpListener.Start();
     // asio 내부 큐를 돌리는 함수
     io.run();
 
