@@ -75,3 +75,17 @@ void UDPListener::DoReceive()
             DoReceive();  // 다시 수신 대기
         });
 }
+
+void UDPListener::SendTo(const asio::ip::udp::endpoint& target,
+    const uint8_t* data, std::size_t length)
+{
+    if (!m_socket.is_open()) return;
+
+    asio::error_code ec;
+    m_socket.send_to(asio::buffer(data, length), target, 0, ec);
+
+    if (ec)
+    {
+        std::cout << "UDP SendTo 실패: " << ec.message() << std::endl;
+    }
+}

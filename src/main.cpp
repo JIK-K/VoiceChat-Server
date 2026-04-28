@@ -19,7 +19,10 @@ int main()
         }
     );
 
-	UDPListener udpListener(io, 9001, RoomManager::Instance());
+    RoomManager& roomManager = RoomManager::Instance();
+
+    UDPListener udpListener(io, 9001, roomManager);
+    roomManager.SetUdpListener(&udpListener);
 
     tcpListener.Start();
     udpListener.Start();

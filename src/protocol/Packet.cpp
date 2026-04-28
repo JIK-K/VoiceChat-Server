@@ -1,34 +1,54 @@
-﻿#include "Packet.hpp"
+﻿#pragma once
 
-// 헤더 + payload를 하나의 바이트 배열로 합쳐서 반환
-// 네트워크로 전송하기 직전에 호출
-std::vector<uint8_t> SerializePacket(const PacketHeader& header,
+#include <cstdint>
+#include <vector>
+#include <cstring>     // memcpy
+#include <winsock2.h>  // htonl, ntohl, htons, ntohs
+
+// 구조체 패딩 제거 (정확히 13바이트 보장)
+#pragma pack(push, 1)
+struct PacketHeader {
+    uint8_t  type;          // 0x01: 제어, 0x02: 음성
+    int32_t  roomId;
+    int32_t  userId;
+    uint16_t sequence;
+    uint16_t payloadLength;
+};
+#pragma pack(pop)
+
+constexpr uint8_t PACKET_TYPE_CONTROL = 0x01;
+constexpr uint8_t PACKET_TYPE_VOICE = 0x02;
+constexpr int HEADER_SIZE = 13;
+
+// ====================== 직렬화 (inline) ======================
+inline std::vector<uint8_t> SerializePacket(const PacketHeader& header,
     const uint8_t* payload,
     uint16_t payloadLen)
 {
-    // 헤더(13바이트) + payload 크기만큼 버퍼 할당
     std::vector<uint8_t> buf(HEADER_SIZE + payloadLen);
 
-    // 헤더 구조체를 버퍼 앞쪽에 복사
-    // pack(1) 덕분에 구조체 메모리 레이아웃 = 전송할 바이트 순서와 동일
-    std::memcpy(buf.data(), &header, HEADER_SIZE);
+    buf[0] = header.type;
+    *reinterpret_cast<int32_t*>(&buf[1]) = htonl(header.roomId);
+    *reinterpret_cast<int32_t*>(&buf[5]) = htonl(header.userId);
+    *reinterpret_cast<uint16_t*>(&buf[9]) = htons(header.sequence);
+    *reinterpret_cast<uint16_t*>(&buf[11]) = htons(header.payloadLength);
 
-    // payload가 있으면 헤더 뒤에 이어서 복사
-    if (payload && payloadLen > 0)
-        std::memcpy(buf.data() + HEADER_SIZE, payload, payloadLen);
-
+    if (payload && payloadLen > 0) {
+        std::memcpy(&buf[HEADER_SIZE], payload, payloadLen);
+    }
     return buf;
 }
 
-// 수신한 바이트 배열에서 헤더만 파싱해서 outHeader에 채워줌
-// payload는 여기서 처리 안 함 → 호출부에서 header.payloadLength만큼 추가로 읽어야 함
-bool DeserializeHeader(const uint8_t* buf, int bufLen, PacketHeader& outHeader)
+// ====================== 역직렬화 (inline) ======================
+inline bool DeserializeHeader(const uint8_t* buf, int bufLen, PacketHeader& outHeader)
 {
-    // 13바이트 미만이면 헤더가 잘린 것 → 잘못된 패킷
-    if (bufLen < HEADER_SIZE)
-        return false;
+    if (bufLen < HEADER_SIZE) return false;
 
-    // 버퍼 앞 13바이트를 구조체로 복사
-    std::memcpy(&outHeader, buf, HEADER_SIZE);
+    outHeader.type = buf[0];
+    outHeader.roomId = ntohl(*reinterpret_cast<const int32_t*>(&buf[1]));
+    outHeader.userId = ntohl(*reinterpret_cast<const int32_t*>(&buf[5]));
+    outHeader.sequence = ntohs(*reinterpret_cast<const uint16_t*>(&buf[9]));
+    outHeader.payloadLength = ntohs(*reinterpret_cast<const uint16_t*>(&buf[11]));
+
     return true;
 }

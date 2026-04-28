@@ -14,6 +14,9 @@ public:
     void Start();
     void Stop();
 
+    void SendTo(const asio::ip::udp::endpoint& target,
+        const uint8_t* data, std::size_t length);
+
 private:
     void DoReceive();
 

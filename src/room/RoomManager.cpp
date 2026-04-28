@@ -2,6 +2,7 @@
 #include "Room.hpp"
 #include "../protocol/Packet.hpp"     // PacketHeader, DeserializeHeader, PACKET_TYPE_VOICE
 #include <iostream>
+#include "../network/UDPListener.hpp"
 
 RoomManager& RoomManager::Instance()
 {
@@ -55,38 +56,74 @@ std::vector<std::pair<int, int>> RoomManager::GetRoomList()
 void RoomManager::HandleUdpVoicePacket(const asio::ip::udp::endpoint& senderEndpoint,
     const char* data, int length)
 {
-    if (length < HEADER_SIZE)
-    {
-        std::cout << "[UDP] 패킷 크기 부족 (" << length << " bytes)" << std::endl;
-        return;
-    }
+    if (length < HEADER_SIZE) return;
 
-    // 1. 헤더 파싱
     PacketHeader header;
     if (!DeserializeHeader(reinterpret_cast<const uint8_t*>(data), HEADER_SIZE, header))
-    {
-        std::cout << "[UDP] 헤더 파싱 실패" << std::endl;
         return;
-    }
 
-    // 2. 음성 패킷인지 확인
     if (header.type != PACKET_TYPE_VOICE)
-    {
-        std::cout << "[UDP] 잘못된 패킷 타입: " << (int)header.type << std::endl;
         return;
-    }
 
-    // 3. 해당 방 찾기
+    // 엔드포인트 최신화
+    RegisterUdpEndpoint(header.userId, senderEndpoint);
+
     auto room = FindRoom(header.roomId);
     if (!room)
     {
-        std::cout << "[UDP] 존재하지 않는 방: roomId=" << header.roomId << std::endl;
-        return;
+        std::lock_guard<std::mutex> lock(_mutex);
+        _rooms[header.roomId] = std::make_shared<Room>(header.roomId);
+        room = _rooms[header.roomId];
     }
 
-    // 4. Room에게 릴레이 위임 (송신자 제외 브로드캐스트)
     const char* payload = data + HEADER_SIZE;
     int payloadLen = length - HEADER_SIZE;
 
     room->BroadcastVoice(senderEndpoint, header, payload, payloadLen);
+}
+
+void RoomManager::RegisterUdpEndpoint(int userId, const asio::ip::udp::endpoint& endpoint)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    _userEndpoints[userId] = endpoint;
+    std::cout << "[UDP] User " << userId << " endpoint 등록: "
+        << endpoint.address().to_string() << ":" << endpoint.port() << std::endl;
+}
+
+asio::ip::udp::endpoint RoomManager::GetUdpEndpoint(int userId) const
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    auto it = _userEndpoints.find(userId);
+    if (it != _userEndpoints.end())
+        return it->second;
+    return asio::ip::udp::endpoint();  // 빈 endpoint
+}
+
+void RoomManager::RemoveUdpEndpoint(int userId)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    _userEndpoints.erase(userId);
+}
+
+void RoomManager::SendVoicePacket(const asio::ip::udp::endpoint& target,
+    const uint8_t* data, std::size_t length)
+{
+    if (m_udpListener == nullptr)
+    {
+        std::cout << "[RoomManager] SendVoicePacket 실패: UDPListener가 없습니다." << std::endl;
+        return;
+    }
+
+    m_udpListener->SendTo(target, data, length);
+}
+
+std::vector<std::pair<int, asio::ip::udp::endpoint>> RoomManager::GetAllUdpEndpoints() const
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    std::vector<std::pair<int, asio::ip::udp::endpoint>> result;
+    for (const auto& pair : _userEndpoints)
+    {
+        result.emplace_back(pair.first, pair.second);
+    }
+    return result;
 }

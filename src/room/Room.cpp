@@ -3,6 +3,7 @@
 #include "../protocol/Packet.hpp"
 #include <iostream>
 #include <algorithm>   // std::remove_if
+#include "RoomManager.hpp"
 
 Room::Room(int roomId) : _roomId(roomId) {}
 
@@ -35,34 +36,29 @@ void Room::BroadcastVoice(const asio::ip::udp::endpoint& senderEndpoint,
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    if (_sessions.empty())
-    {
-        std::cout << "ROOM [" << _roomId << "] BroadcastVoice: 세션이 없습니다." << std::endl;
-        return;
-    }
-
-    int targetCount = 0;
-
-    // 전체 패킷 재구성 (header + payload)
     auto fullPacket = SerializePacket(header,
         reinterpret_cast<const uint8_t*>(payload),
         static_cast<uint16_t>(payloadLen));
 
-    for (auto& session : _sessions)
+    int targetCount = 0;
+    RoomManager& rm = RoomManager::Instance();
+
+    for (const auto& pair : rm.GetAllUdpEndpoints())
     {
-        if (session->GetUserId() == header.userId)
-            continue;   // 자신에게는 보내지 않음
+        if (pair.first == header.userId)
+            continue;
 
         targetCount++;
-
-        // TODO: 실제 UDP 전송 로직 (Session에 endpoint가 준비되면 여기서 호출)
-        // session->SendVoicePacket(fullPacket);
+        rm.SendVoicePacket(pair.second, fullPacket.data(), fullPacket.size());
     }
 
-    std::cout << "ROOM [" << _roomId << "] Voice Broadcast → "
-        << targetCount << " clients ("
-        << fullPacket.size() << " bytes) | From User "
-        << header.userId << std::endl;
+    if (targetCount > 0)
+    {
+        std::cout << "ROOM [" << _roomId << "] Voice Broadcast → "
+            << targetCount << " clients ("
+            << fullPacket.size() << " bytes) | From User "
+            << header.userId << std::endl;
+    }
 }
 // ====================================================================
 
