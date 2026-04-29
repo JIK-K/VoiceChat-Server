@@ -123,6 +123,16 @@ void Session::HandlePacket(const PacketHeader& header, const std::string& payloa
 
             RoomManager::Instance().JoinRoom(_roomId, shared_from_this());
 
+            auto roomList = RoomManager::Instance().GetRoomList();
+            json roomListJson = {
+                {"event", "room_list"},
+                {"rooms", json::array()}
+            };
+            for (auto& [rId, count] : roomList)
+                roomListJson["rooms"].push_back({ {"roomId", rId}, {"count", count} });
+
+            SessionManager::Instance().BroadcastAll(roomListJson.dump());
+
             auto room = RoomManager::Instance().FindRoom(_roomId);
 
             if (room) {
