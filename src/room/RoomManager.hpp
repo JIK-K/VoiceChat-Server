@@ -15,7 +15,7 @@ public:
     static RoomManager& Instance();
 
     void JoinRoom(int roomId, std::shared_ptr<Session> session);
-    void LeaveRoom(int roomId, int userId);
+    bool LeaveRoom(int roomId, int userId);
 
     std::shared_ptr<Room> FindRoom(int roomId);
     std::vector<std::pair<int, int>> GetRoomList();

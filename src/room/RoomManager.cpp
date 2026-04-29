@@ -20,18 +20,21 @@ void RoomManager::JoinRoom(int roomId, std::shared_ptr<Session> session)
     _rooms[roomId]->AddSession(session);
 }
 
-void RoomManager::LeaveRoom(int roomId, int userId)
+bool RoomManager::LeaveRoom(int roomId, int userId)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     auto it = _rooms.find(roomId);
-    if (it == _rooms.end()) return;
+    if (it == _rooms.end()) return false;
 
     it->second->RemoveSession(userId);
 
     if (it->second->IsEmpty()) {
         _rooms.erase(it);
         std::cout << "ROOM [" << roomId << "] DELETED" << std::endl;
+        return true;
     }
+
+    return false;
 }
 
 std::shared_ptr<Room> RoomManager::FindRoom(int roomId)
@@ -69,11 +72,15 @@ void RoomManager::HandleUdpVoicePacket(const asio::ip::udp::endpoint& senderEndp
     RegisterUdpEndpoint(header.userId, senderEndpoint);
 
     auto room = FindRoom(header.roomId);
+
     if (!room)
     {
-        std::lock_guard<std::mutex> lock(_mutex);
-        _rooms[header.roomId] = std::make_shared<Room>(header.roomId);
-        room = _rooms[header.roomId];
+        // UDP 왔을때 방 만들면 안됨.
+        //std::lock_guard<std::mutex> lock(_mutex);
+        //_rooms[header.roomId] = std::make_shared<Room>(header.roomId);
+        //room = _rooms[header.roomId];
+        std::cout << "[UDP] roomId : " << header.roomId << "NO EXIST ROOM\n";
+        return;
     }
 
     const char* payload = data + HEADER_SIZE;
@@ -85,6 +92,11 @@ void RoomManager::HandleUdpVoicePacket(const asio::ip::udp::endpoint& senderEndp
 void RoomManager::RegisterUdpEndpoint(int userId, const asio::ip::udp::endpoint& endpoint)
 {
     std::lock_guard<std::mutex> lock(_mutex);
+    
+    // 동일한 엔드포인트 = 스킵
+    auto it = _userEndpoints.find(userId);
+    if (it != _userEndpoints.end() && it->second == endpoint)
+        return;
     _userEndpoints[userId] = endpoint;
     std::cout << "[UDP] User " << userId << " endpoint 등록: "
         << endpoint.address().to_string() << ":" << endpoint.port() << std::endl;

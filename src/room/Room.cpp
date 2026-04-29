@@ -43,13 +43,17 @@ void Room::BroadcastVoice(const asio::ip::udp::endpoint& senderEndpoint,
     int targetCount = 0;
     RoomManager& rm = RoomManager::Instance();
 
-    for (const auto& pair : rm.GetAllUdpEndpoints())
+    for (const auto& session : _sessions)
     {
-        if (pair.first == header.userId)
+        if (session->GetUserId() == header.userId)
+            continue;
+        
+        auto endpoint = rm.GetUdpEndpoint(session->GetUserId());
+        if (endpoint.port() == 0)
             continue;
 
         targetCount++;
-        rm.SendVoicePacket(pair.second, fullPacket.data(), fullPacket.size());
+        rm.SendVoicePacket(endpoint, fullPacket.data(), fullPacket.size());
     }
 
     if (targetCount > 0)
